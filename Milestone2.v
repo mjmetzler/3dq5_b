@@ -96,34 +96,34 @@ always @(posedge CLOCK or negedge Resetn) begin
     end else begin
     
         if (read_flagY) begin
-            counterM <= counterM + 1'd1;
-            if (&counterM) begin
-                if (counterC == 6'd39) begin
-                    counterC <= 6'd0;
-                    if (counterR == 5'd29)
-                        counterR <= 5'd0;
+            counterM_ry <= counterM_ry + 1'd1;
+            if (&counterM_ry) begin
+                if (counterC_ry == 6'd39) begin
+                    counterC_ry <= 6'd0;
+                    if (counterR_ry == 5'd29)
+                        counterR_ry <= 5'd0;
                         ready_y_done <= 1'b1;
                     end else
-                        counterR <= counterR + 1'd1;
+                        counterR_ry <= counterR_ry + 1'd1;
                     end
                 end else
-                    counterC <= counterC + 1'd1;
+                    counterC_ry <= counterC_ry + 1'd1;
             end
         end
         
         if (write_flagY) begin
-            counterM_y <= counterM_y + 1'd1;
-            if (&counterM_y) begin
-                if (counterC_y == 6'd39) begin
-                    counterC_y <= 6'd0;
-                    if (counterR_y == 5'd29)
-                        counterR_y <= 5'd0;
+            counterM_wy <= counterM_wy + 1'd1;
+            if (&counterM_wy) begin
+                if (counterC_wy == 6'd39) begin
+                    counterC_wy <= 6'd0;
+                    if (counterR_wy == 5'd29)
+                        counterR_wy <= 5'd0;
                         y_done <= 1'b1;
                     end else
-                        counterR_y <= counterR_y + 1'd1;
+                        counterR_wy <= counterR_wy + 1'd1;
                     end
                 end else
-                    counterC_y <= counterC_y + 1'd1;
+                    counterC_wy <= counterC_wy + 1'd1;
             end
         end
         
