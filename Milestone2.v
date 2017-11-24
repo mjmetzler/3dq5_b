@@ -32,18 +32,58 @@ assign prod3 = (prod3_long[63] == 1'b0 ? (prod3_long[31:0] : ~prod3_long[31:0] +
 assign prod4_long = $signed(op3*op4);//op2*op4;
 assign prod1 = (prod4_long[63] == 1'b0 ? (prod4_long[31:0] : ~prod4_long[31:0] + 1'd1));
 
-//modulo-counter system for Y
+//modulo-counter system for reading Y
 logic [17:0] read_address;
 logic [8:0] RA, CA;
 logic [5:0] counterM, counterC;
 logic [4:0] counterR;
-logic [3:0] ri, ci;
+logic [2:0] ri, ci;
 
 assign ri = counterM[5:3];
 assign ci = counterM[2:0];
 assign RA = {counterR,ri};
 assign CA = {counterC,ci};
-assign read_address = {RA,8'd0} + {RA,6'd0} + CA;
+assign read_address = yidct_offset + {RA,8'd0} + {RA,6'd0} + CA;
+
+//modulo-counter system for writing Y
+logic [17:0] write_address;
+logic [7:0] RA_y, CA_y;
+logic [5:0] counterC_y;
+logic [4:0] counterM_y, counterR_y;
+logic [2:0] ri_y;
+logic [1:0] ci_y;
+
+assign ri_y = counterM_y[4:2];
+assign ci_y = counterM_y[1:0];
+assign RA_y = {counterR_y,ri_y};
+assign CA_y = {counterC_y,ci_y};
+assign write_address = y_offset + {RA_y,7'd0} + {RA_y,5'd0} + CA_y;
+
+//modulo-counter system for reading U/V
+logic [17:0] read_address_uv;
+logic [7:0] RA_ruv, CA_ruv;
+logic [5:0] counterM_ruv;
+logic [4:0] counterR_ruv, counterC_ruv;
+logic [2:0] ri_ruv, ci_ruv;
+
+assign ri_ruv = counterM_ruv[5:3];
+assign ci_ruv = counterM_ruv[2:0];
+assign RA_ruv = {counterR_ruv,ri_ruv};
+assign CA_ruv = {counterC_ruv,ci_ruv};
+assign read_address_uv = uvidct_offset + {RA_ruv,7'd0} + {RA_ruv,5'd0} + CA_ruv;
+
+//modulo-counter system for writing U/V
+logic [17:0] write_address_uv;
+logic [7:0] RA_wuv, CA_wuv;
+logic [4:0] counterM_wuv, counterR_wuv, counterC_wuv;
+logic [2:0] ri_wuv;
+logic [1:0] ci_wuv;
+
+assign ri_wuv = counterM_wuv[4:2];
+assign ci_wuv = counterM_wuv[1:0];
+assign RA_wuv = {counterR_wuv,ri_wuv};
+assign CA_wuv = {counterC_wuv,ci_wuv};
+assign write_address_uv = uv_offset + {RA_wuv,6'd0} + {RA_wuv,4'd0} + CA_wuv;
 
 always @(posedge CLOCK or negedge Resetn) begin
 
@@ -55,7 +95,7 @@ always @(posedge CLOCK or negedge Resetn) begin
     
     end else begin
     
-        if (read_flag_Y) begin
+        if (read_flagY) begin
             counterM <= counterM + 1'd1;
             if (&counterM) begin
                 if (counterC == 6'd39) begin
@@ -68,6 +108,54 @@ always @(posedge CLOCK or negedge Resetn) begin
                     end
                 end else
                     counterC <= counterC + 1'd1;
+            end
+        end
+        
+        if (write_flagY) begin
+            counterM_y <= counterM_y + 1'd1;
+            if (&counterM_y) begin
+                if (counterC_y == 6'd39) begin
+                    counterC_y <= 6'd0;
+                    if (counterR_y == 5'd29)
+                        counterR_y <= 5'd0;
+                        y_done <= 1'b1;
+                    end else
+                        counterR_y <= counterR_y + 1'd1;
+                    end
+                end else
+                    counterC_y <= counterC_y + 1'd1;
+            end
+        end
+        
+        if (read_flagUV) begin
+            counterM_ruv <= counterM_ruv + 1'd1;
+            if (&counterM_ruv) begin
+                if (counterC_ruv == 6'd19) begin
+                    counterC_ruv <= 6'd0;
+                    if (counterR_ruv == 5'd29)
+                        counterR_ruv <= 5'd0;
+                        ready_uv_done <= 1'b1;
+                    end else
+                        counterR_ruv <= counterR_ruv + 1'd1;
+                    end
+                end else
+                    counterC_ruv <= counterC_ruv + 1'd1;
+            end
+        end
+        
+        if (write_flagUV) begin
+            counterM_wuv <= counterM_wuv + 1'd1;
+            if (&counterM_wuv) begin
+                if (counterC_wuv == 6'd19) begin
+                    counterC_wuv <= 6'd0;
+                    if (counterR_wuv == 5'd29)
+                        counterR_wuv <= 5'd0;
+                        uv_done <= 1'b1;
+                    end else
+                        counterR_wuv <= counterR_wuv + 1'd1;
+                    end
+                end else
+                    counterC_wuv <= counterC_wuv + 1'd1;
             end
         end
                     
@@ -625,6 +713,56 @@ always @(posedge CLOCK or negedge Resetn) begin
                 sb_adr <= 6'd0;
                 state <= S_write_outa;
             end
+        end
+            
+        //initialize writeout to 0
+        S_write_outa: begin
+            dp2_adr_a <= s_adr;
+            s_adr <= s_adr + 1'd1;
+            dp2_adr_b <= s_adrb;
+            s_adrb <= s_adrb + 1'd1;
+            dp2_enable_a <= 1'b0;
+            dp2_enable_b <= 1'b0;
+            writeout <= writeout + 6'd1;
+            if (writeout == 6'd1) begin
+                write_flagUV <= 1'b1;
+                m2_state <= S_write_outb;
+            end
+        end
+            
+        S_write_outb: begin
+            SRAM_address <= write_address_uv;
+            SRAM_write_data[15:8] <= (dp2_read_data_a[31]) ? 8'd0 : ( (|dp2_read_data_a[30:24]) ? 8'd255 : dp2_read_data_a[23:16] );
+            SRAM_write_data[7:0] <= (dp2_read_data_b[31]) ? 8'd0 : ( (|dp2_read_data_b[30:24]) ? 8'd255 : dp2_read_data_b[23:16] );
+            SRAM_we_enable <= 1'b0;
+            
+            dp2_adr_a <= s_adr;
+            dp2_adr_b <= s_adrb;
+            dp2_enable_a <= 1'b0;
+            dp2_enable_b <= 1'b0;
+            
+            if ( (s_adr == 6'd7) || (s_adr == 6'd23) || (s_adr == 6'd39) || (s_adr == 6'd55) ) begin
+                s_adr <= s_adr + 6'd9;
+                s_adrb <= s_adrb + 6'd9;
+            end else begin
+                s_adr <= s_adr + 1'd1;
+                s_adrb <= s_adrb + 1'd1;
+            end
+            
+            writeout <= writeout + 6'd1;
+            if (writeout == 6'd31)
+                m2_state <= S_write_outc;
+        end
+        
+        S_write_outc: begin
+            SRAM_address <= write_address_uv;
+            SRAM_write_data[15:8] <= (dp2_read_data_a[31]) ? 8'd0 : ( (|dp2_read_data_a[30:24]) ? 8'd255 : dp2_read_data_a[23:16] );
+            SRAM_write_data[7:0] <= (dp2_read_data_b[31]) ? 8'd0 : ( (|dp2_read_data_b[30:24]) ? 8'd255 : dp2_read_data_b[23:16] );
+            SRAM_we_enable <= 1'b0;
+            
+            writeout <= writeout + 6'd1;
+            if (writeout == 6'd33)
+                m2_state <= S_idle2;
         end
         
         endcase
