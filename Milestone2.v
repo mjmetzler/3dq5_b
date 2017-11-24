@@ -78,16 +78,18 @@ always @(posedge CLOCK or negedge Resetn) begin
         end
         
         S_read_in: begin
-            
+            //1 cycle to toggle read_flag
             if (toggle) begin
                 toggle <= ~toggle;
                 read_flag <= 1'b1;
             end
+            //3 cycles to begin reading from SRAM
             else if (|reads) begin
                 SRAM_address <= read_address;
                 SRAM_we_enable <= 1'b1;
                 reads <= reads - 1'd1;
             end
+            //61 cycles to finish reading from SRAM and begin writing into DP RAM
             else if (|reads_writes) begin
                 SRAM_address <= read_address;
                 SRAM_we_enable <= 1'b1;
@@ -100,6 +102,7 @@ always @(posedge CLOCK or negedge Resetn) begin
                 if(reads_writes == 6'd1)
                     read_flag <= 1'b0;
             end
+            //3 cycles to finish writing to DPRAM
             else if (|writes) begin
                 dp0_adr_a <= s_prime_adr;
                 s_prime_adr <= s_prime_adr + 1'd1;
@@ -108,7 +111,7 @@ always @(posedge CLOCK or negedge Resetn) begin
             end else
                 dp0_enable_a <= 1'b0;
                 s_prime_adr <= 8'd0;
-                sp_adrb <= 8'd0;
+                sp_adrb <= 8'd0;//might neeed to move 
                 m2_state <= S_compute_in;
             end
             
@@ -124,7 +127,7 @@ always @(posedge CLOCK or negedge Resetn) begin
                     sp_adrb <= sp_adrb + 1'd1;
                     dp0_enable_a <= 1'b0;
                     dp0_enable_b <= 1'b0;
-                    leadT <= leadT + 1'd1;
+                    leadT <= leadT + 1'd1;//needs to be initialized
                 end
                 else if (leadT == 3'd2) begin
                     dp0_adr_a <= s_prime_adr;
