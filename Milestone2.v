@@ -55,7 +55,7 @@ always @(posedge CLOCK or negedge Resetn) begin
     
     end else begin
     
-        if (read_flag) begin
+        if (read_flag_Y) begin
             counterM <= counterM + 1'd1;
             if (&counterM) begin
                 if (counterC == 6'd39) begin
@@ -78,10 +78,10 @@ always @(posedge CLOCK or negedge Resetn) begin
         end
         
         S_read_in: begin
-            //1 cycle to toggle read_flag
+            //1 cycle to toggle read_flag_Y
             if (toggle) begin
                 toggle <= ~toggle;
-                read_flag <= 1'b1;
+                read_flag_Y <= 1'b1;
             end
             //3 cycles to begin reading from SRAM
             else if (|reads) begin
@@ -100,7 +100,7 @@ always @(posedge CLOCK or negedge Resetn) begin
                 dp0_enable_a <= 1'b1;
                 
                 if(reads_writes == 6'd1)
-                    read_flag <= 1'b0;
+                    read_flag_Y <= 1'b0;
             end
             //3 cycles to finish writing to DPRAM
             else if (|writes) begin
@@ -375,7 +375,10 @@ always @(posedge CLOCK or negedge Resetn) begin
                 end
             end
         end //end compute_in
+            
+        //begin computation for S
         
+        //2 cycles reading the t matrix    
         S_compute_out1: begin
             dp1_adr_a <= s_adr;
             s_adr <= s_adr + 1'd1;
@@ -385,24 +388,27 @@ always @(posedge CLOCK or negedge Resetn) begin
             dp1_enable_b <= 1'b0;
             if (out1_first) begin
                 out1_first <= 1'b0;
-            end else begin
-              m2_state <= S_compute_out2;  
+            end else
+                m2_state <= S_compute_out2;  
         end
         
+        //6 cycles reading the t matrix and computing and accumulating the results (0)    
         S_compute_out2: begin
+            //accumulation
             if (out2 == 3'd1) begin
                 s_aa <= { 8{prod1[31]}, prod1[31:8] };
                 s_ab <= { 8{prod2[31]}, prod2[31:8] };
                 s_ba <= { 8{prod3[31]}, prod3[31:8] };
                 s_bb <= { 8{prod4[31]}, prod4[31:8] };
             end
-            if (out2 > 3'd1) begin
+            else if (out2 > 3'd1) begin
                 s_aa <= s_aa + { 8{prod1[31]}, prod1[31:8] };
                 s_ab <= s_ab + { 8{prod2[31]}, prod2[31:8] };
                 s_ba <= s_ba + { 8{prod3[31]}, prod3[31:8] };
                 s_bb <= s_bb + { 8{prod4[31]}, prod4[31:8] };
             end
             
+            //address incrementation
             dp1_adr_a <= s_adr;
             s_adr <= s_adr + 1'd1;
             dp1_adr_b <= s_adrb;
@@ -410,12 +416,14 @@ always @(posedge CLOCK or negedge Resetn) begin
             dp1_enable_a <= 1'b0;
             dp1_enable_b <= 1'b0;
 
+            //data reading 
             op1 <= dp1_read_data_a;
             op2 <= dp1_read_data_b;
             transpose_pair <= transpose_pair_count; //sets op3 and op4 as values from the C transpose matrix
             transpose_pair_count <= transpose_pair_count + 1'd1;
             out2 <= out2 + 1'd1;
             
+            //state transitions and reset
             if (out2 == 3'd5) begin
                 s_adr <= 8'd0;
                 s_adrb <= 8'd8;
@@ -425,19 +433,23 @@ always @(posedge CLOCK or negedge Resetn) begin
         end
         
         S_compute_out3: begin //common case of 
+            //2 cycles of reads (0) and computes (-1)
             if (|stage_a_out) begin
+                //reads
                 s_aa <= s_aa + { 8{prod1[31]}, prod1[31:8] };
                 s_ab <= s_ab + { 8{prod2[31]}, prod2[31:8] };
                 s_ba <= s_ba + { 8{prod3[31]}, prod3[31:8] };
                 s_bb <= s_bb + { 8{prod4[31]}, prod4[31:8] };
 
+                //address increments
                 dp1_adr_a <= s_adr;
                 s_adr <= s_adr + 1'd1;
                 dp1_adr_b <= s_adrb;
                 s_adrb <= s_adrb + 1'd1;
                 dp1_enable_a <= 1'b0;
                 dp1_enable_b <= 1'b0;
-
+                
+                //computes
                 op1 <= dp1_read_data_a;
                 op2 <= dp1_read_data_b;
                 transpose_pair <= transpose_pair_count; //sets op3 and op4 as values from the C transpose matrix
@@ -453,7 +465,9 @@ always @(posedge CLOCK or negedge Resetn) begin
                     result_s_ba <= s_ba + { 8{prod3[31]}, prod3[31:8] };
                     result_s_bb <= s_bb + { 8{prod4[31]}, prod4[31:8] }; 
                 end
-                else if ((c_count_pair == 5'd1) || (c_count_pair == 5'd9) || (c_count_pair == 5'd17) || (c_count_pair == 5'd25)) begin
+                
+                //accumulating results of current cycle multiplication
+                else if ((transpose_pair_count == 5'd1) || (transpose_pair_count == 5'd9) || (transpose_pair_count == 5'd17) || (transpose_pair_count == 5'd25)) begin
                     s_aa <= { 8{prod1[31]}, prod1[31:8] };
                     s_ab <= { 8{prod2[31]}, prod2[31:8] };
                     s_ba <= { 8{prod3[31]}, prod3[31:8] };
@@ -477,7 +491,7 @@ always @(posedge CLOCK or negedge Resetn) begin
                 //setting operands for the matrix multiplications
                 op1 <= dp1_read_data_a;
                 op2 <= dp1_read_data_b;
-                c_pair <= c_pair_count; //sets op3 and op4 as values from the C transpose matrix
+                transpose_pair <= transpose_pair_count; //sets op3 and op4 as values from the C transpose matrix
                 transpose_pair_count <= transpose_pair_count + 1'd1;
 
                 //writing the 4 s values into dp-ram 2
@@ -491,7 +505,7 @@ always @(posedge CLOCK or negedge Resetn) begin
                     sa_adr <= sa_adr + 1'd1;
                     sb_adr <= sb_adr + 1'd1;
                 end
-                if (stage_b == 2'd1) begin
+                else if (stage_b_out == 2'd1) begin
                     dp2_adr_a <= sa_adr;
                     dp2_adr_b <= sb_adr;
                     dp2_write_data_a <= result_s_aa;
@@ -509,6 +523,8 @@ always @(posedge CLOCK or negedge Resetn) begin
                 end
                 stage_b_out <= stage_b_out - 2'd1;
             end //stage_b
+            
+            //3 cycles to read and compute for the current cycle (0)
             else begin //stage_c
 
                 //accumulating the results of the previous cycle's multiplication
@@ -520,7 +536,7 @@ always @(posedge CLOCK or negedge Resetn) begin
                 //setting operands for the matrix multiplications
                 op1 <= dp1_read_data_a;
                 op2 <= dp1_read_data_b;
-                c_pair <= c_pair_count; //sets op3 and op4 as values from the C transpose matrix
+                transpose_pair <= transpose_pair_count; //sets op3 and op4 as values from the C transpose matrix
                 transpose_pair_count <= transpose_pair_count + 1'd1;
 
                 // reading s values 
@@ -559,7 +575,9 @@ always @(posedge CLOCK or negedge Resetn) begin
             end //end stage_c
         end //end compute_out3
         
+        //5 cycle lead out state
         S_compute_out4: begin
+            //2 computes and accumulations
             if (|compute_end_out) begin
                 s_aa <= s_aa + { 8{prod1[31]}, prod1[31:8] };
                 s_ab <= s_ab + { 8{prod2[31]}, prod2[31:8] };
@@ -569,17 +587,22 @@ always @(posedge CLOCK or negedge Resetn) begin
                 //setting operands for the matrix multiplications
                 op1 <= dp1_read_data_a;
                 op2 <= dp1_read_data_b;
-                c_pair <= c_pair_count; //sets op3 and op4 as values from the C transpose matrix
+                transpose_pair <= transpose_pair_count; //sets op3 and op4 as values from the C transpose matrix
                 transpose_pair_count <= transpose_pair_count + 1'd1;
 
                 compute_end_out <= compute_end_out - 2'd1;
-            end else if (last_multiplication_out) begin
+            end 
+            
+            //last accumulation
+            else if (last_multiplication_out) begin
                 last_multiplication_out <= 1'b0;
                 result_s_aa <= s_aa + { 8{prod1[31]}, prod1[31:8] };
                 result_s_ab <= s_ab + { 8{prod2[31]}, prod2[31:8] };
                 result_s_ba <= s_ba + { 8{prod3[31]}, prod3[31:8] };
                 result_s_bb <= s_bb + { 8{prod4[31]}, prod4[31:8] };
-            end else if (sb_adr == 6'd62) begin
+            end 
+            //second last write into DPRAM
+            else if (sb_adr == 6'd62) begin
                 dp2_adr_a <= sa_adr;
                 dp2_adr_b <= sb_adr;
                 dp2_write_data_a <= result_s_aa;
@@ -588,11 +611,14 @@ always @(posedge CLOCK or negedge Resetn) begin
                 dp2_enable_b <= 1'b1;
                 sa_adr <= sa_adr + 1'd1;
                 sb_adr <= sb_adr + 1'd1;
-            end else begin
+            end 
+            
+            //last write into DPRAM
+            else begin
                 dp2_adr_a <= sa_adr;
                 dp2_adr_b <= sb_adr;
-                dp2_write_data_a <= result_s_aa;
-                dp2_write_data_b <= result_s_ba;
+                dp2_write_data_a <= result_s_ab;
+                dp2_write_data_b <= result_s_bb;
                 dp2_enable_a <= 1'b1;
                 dp2_enable_b <= 1'b1;
                 sa_adr <= 6'd0;
