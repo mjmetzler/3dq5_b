@@ -178,158 +178,74 @@ always @(posedge CLOCK or negedge Resetn) begin
                     end else
                         leadT <= leadT + 1'd1;
                 end
-                else if (!T_end) begin
-                    if (|stage_a) begin
-                        t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
-                        t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
-                        t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
-                        t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
-                                                
-                        dp0_adr_a <= s_prime_adr;
-                        s_prime_adr <= s_prime_adr + 1'd1;
-                        dp0_adr_b <= sp_adrb;
-                        sp_adrb <= sp_adrb + 1'd1;
-                        dp0_enable_a <= 1'b0;
-                        dp0_enable_b <= 1'b0;
+            end
+            else if (!T_end) begin
+                //2 cycles to read(0) and compute(-1)
+                if (|stage_a) begin
+                    //accumulating matrix values
+                    t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
+                    t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
+                    t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
+                    t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
 
-                        op1 <= dp0_read_data_a;
-                        op2 <= dp0_read_data_b;
-                        c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
-                        c_pair_count <= c_pair_count + 1'd1;
-                        
-                        stage_a <= stage_a - 2'd1;
+                    //preparing next addresses to read from dual port
+                    dp0_adr_a <= s_prime_adr;
+                    s_prime_adr <= s_prime_adr + 1'd1;
+                    dp0_adr_b <= sp_adrb;
+                    sp_adrb <= sp_adrb + 1'd1;
+                    dp0_enable_a <= 1'b0;
+                    dp0_enable_b <= 1'b0;
+
+                    //reading s' values from dual port
+                    op1 <= dp0_read_data_a;
+                    op2 <= dp0_read_data_b;
+                    c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
+                    c_pair_count <= c_pair_count + 1'd1;
+
+                    stage_a <= stage_a - 2'd1;
+                end
+                //3 cycles to read(0), write(-1) and compute(0)
+                else if (|stage_b) begin
+                    //final matrix values (from previous stage)
+                    if(stage_b == 2'd3) begin
+                        result_t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
+                        result_t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
+                        result_t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
+                        result_t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] }; 
                     end
-                    else if (|stage_b) begin
-                        //accumulating the results of the previous cycle's multiplication
-                        if(stage_b == 2'd3) begin
-                            result_t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
-                            result_t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
-                            result_t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
-                            result_t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] }; 
-                        end
-                        else if ((c_count_pair == 5'd1) || (c_count_pair == 5'd9) || (c_count_pair == 5'd17) || (c_count_pair == 5'd25)) begin
-                            t_aa <= { 8{prod1[31]}, prod1[31:8] };
-                            t_ab <= { 8{prod2[31]}, prod2[31:8] };
-                            t_ba <= { 8{prod3[31]}, prod3[31:8] };
-                            t_bb <= { 8{prod4[31]}, prod4[31:8] };
-                        end
-                        else begin
-                            t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
-                            t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
-                            t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
-                            t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
-                        end 
-                        
-                        //reading s' values from dp-ram 0
-                        dp0_adr_a <= s_prime_adr;
-                        s_prime_adr <= s_prime_adr + 1'd1;
-                        dp0_adr_b <= sp_adrb;
-                        sp_adrb <= sp_adrb + 1'd1;
-                        dp0_enable_a <= 1'b0;
-                        dp0_enable_b <= 1'b0;
-                        
-                        //setting operands for the matrix multiplications
-                        op1 <= dp0_read_data_a;
-                        op2 <= dp0_read_data_b;
-                        c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
-                        c_pair_count <= c_pair_count + 1'd1;
-                        
-                        //writing the 4 T values into dp-ram 1
-                        if (stage_b == 2'd2) begin
-                            dp1_adr_a <= ta_adr;
-                            dp1_adr_b <= tb_adr;
-                            dp1_write_data_a <= result_t_aa;
-                            dp1_write_data_b <= result_t_ba;
-                            dp1_enable_a <= 1'b1;
-                            dp1_enable_b <= 1'b1;
-                            ta_adr <= ta_adr + 1'd1;
-                            tb_adr <= tb_adr + 1'd1;
-                        end
-                        if (stage_b == 2'd1) begin
-                            dp1_adr_a <= ta_adr;
-                            dp1_adr_b <= tb_adr;
-                            dp1_write_data_a <= result_t_ab;
-                            dp1_write_data_b <= result_t_bb;
-                            dp1_enable_a <= 1'b1;
-                            dp1_enable_b <= 1'b1;
-                            
-                            if ((ta_adr == 6'd7) || (ta_adr == 6'd23) || (ta_adr == 6'd39) || (ta_adr == 6'd55)) begin
-                                ta_adr <= ta_adr + 1'd9;
-                                tb_adr <= tb_adr + 1'd9;
-                            end else begin
-                                ta_adr <= ta_adr + 1'd1;
-                                tb_adr <= tb_adr + 1'd1;
-                            end
-                        end
-                        stage_b <= stage_b - 2'd1;
-                    end //stage_b
-                    else begin //stage_c
-                        
-                        //accumulating the results of the previous cycle's multiplication
+                    //accumulating and computing matrix values
+                    //reset case (from previous accumulation)
+                    else if ((c_count_pair == 5'd1) || (c_count_pair == 5'd9) || (c_count_pair == 5'd17) || (c_count_pair == 5'd25)) begin
+                        t_aa <= { 8{prod1[31]}, prod1[31:8] };
+                        t_ab <= { 8{prod2[31]}, prod2[31:8] };
+                        t_ba <= { 8{prod3[31]}, prod3[31:8] };
+                        t_bb <= { 8{prod4[31]}, prod4[31:8] };
+                    end
+                    //common accumulation case
+                    else begin
                         t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
                         t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
                         t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
                         t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
-                        
-                        //setting operands for the matrix multiplications
-                        op1 <= dp0_read_data_a;
-                        op2 <= dp0_read_data_b;
-                        c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
-                        c_pair_count <= c_pair_count + 1'd1;
-                        
-                        // reading s' values 
-                        if (stage_c == 2'd1) begin //last read of the current set of 4 multiplications
-                            dp0_adr_a <= s_prime_adr;
-                            dp0_adr_b <= sp_adrb;
-                            dp0_enable_a <= 1'b0;
-                            dp0_enable_b <= 1'b0;
-                            
-                            stage_a <= 2'd2;
-                            stage_b <= 2'd3;
-                            stage_c <= 2'd3;
-                            
-                            if (sp_read_cycle == 4'd15) begin // have done all reads to compute the current 8 by 8 matrix
-                                s_prime_adr <= 6'd0;
-                                sp_adrb <= 6'd8;
-                                T_end <= 1'b1;
-                            end
-                            //begin using next two rows of s'
-                            else if ((sp_read_cycle == 4'd3) ||(sp_read_cycle == 4'd7) || (sp_read_cycle == 4'd11)) begin
-                                s_prime_adr <= s_prime_adr + 6'd9;
-                                sp_adrb <= sp_adrb + 6'd9;
-                            end else begin // reset the s' values to the start of the rows
-                                s_prime_adr <= s_prime_adr - 6'd7;
-                                sp_adrb <= sp_adrb - 6'd7;
-                            end
-                        end else begin
-                            dp0_adr_a <= s_prime_adr;
-                            dp0_adr_b <= sp_adrb;
-                            dp0_enable_a <= 1'b0;
-                            dp0_enable_b <= 1'b0;
-                            s_prime_adr <= s_prime_adr + 1'd1;
-                            sp_adrb <= sp_adrb + 1'd1;
-                            stage_c <= stage_c - 2'd1;
-                        end
-                    end //end stage_c   
-                end else begin //T_end
-                    if (|compute_end) begin
-                        t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
-                        t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
-                        t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
-                        t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
-                        
-                        //setting operands for the matrix multiplications
-                        op1 <= dp0_read_data_a;
-                        op2 <= dp0_read_data_b;
-                        c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
-                        c_pair_count <= c_pair_count + 1'd1;
-                    end else if (last_multiplication) begin
-                        last_multiplication <= 1'b0;
-                        t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
-                        t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
-                        t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
-                        t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
-                    end else if (tb_adr == 6'd62) begin
+                    end 
+
+                    //preparing next addresses to read from dual port
+                    dp0_adr_a <= s_prime_adr;
+                    s_prime_adr <= s_prime_adr + 1'd1;
+                    dp0_adr_b <= sp_adrb;
+                    sp_adrb <= sp_adrb + 1'd1;
+                    dp0_enable_a <= 1'b0;
+                    dp0_enable_b <= 1'b0;
+
+                    //reading s' values from dual port
+                    op1 <= dp0_read_data_a;
+                    op2 <= dp0_read_data_b;
+                    c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
+                    c_pair_count <= c_pair_count + 1'd1;
+
+                    //writing the 4 T values into dp-ram 1
+                    //first pair
+                    if (stage_b == 2'd2) begin
                         dp1_adr_a <= ta_adr;
                         dp1_adr_b <= tb_adr;
                         dp1_write_data_a <= result_t_aa;
@@ -338,17 +254,126 @@ always @(posedge CLOCK or negedge Resetn) begin
                         dp1_enable_b <= 1'b1;
                         ta_adr <= ta_adr + 1'd1;
                         tb_adr <= tb_adr + 1'd1;
-                    end else begin
+                    end
+                    //second pair
+                    else if (stage_b == 2'd1) begin
                         dp1_adr_a <= ta_adr;
                         dp1_adr_b <= tb_adr;
                         dp1_write_data_a <= result_t_ab;
                         dp1_write_data_b <= result_t_bb;
                         dp1_enable_a <= 1'b1;
                         dp1_enable_b <= 1'b1;
-                        ta_adr <= 6'd0;
-                        tb_adr <= 6'd0;
-                        state <= megastate_1;
+                        //matrix address incrementation
+                        if ((ta_adr == 6'd7) || (ta_adr == 6'd23) || (ta_adr == 6'd39) || (ta_adr == 6'd55)) begin
+                            ta_adr <= ta_adr + 1'd9;
+                            tb_adr <= tb_adr + 1'd9;
+                        end else begin
+                            ta_adr <= ta_adr + 1'd1;
+                            tb_adr <= tb_adr + 1'd1;
+                        end
+                    end
+                    stage_b <= stage_b - 2'd1;
+                end //stage_b
+                //3 cycles to read(0) and compute (0)
+                else begin //stage_c
+
+                    //accumulating the results of the previous cycle's multiplication
+                    t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
+                    t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
+                    t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
+                    t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
+
+                    //setting operands for the matrix multiplications
+                    op1 <= dp0_read_data_a;
+                    op2 <= dp0_read_data_b;
+                    c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
+                    c_pair_count <= c_pair_count + 1'd1;
+
+                    // reading s' values 
+                    if (stage_c == 2'd1) begin //last read of the current set of 4 multiplications
+                        dp0_adr_a <= s_prime_adr;
+                        dp0_adr_b <= sp_adrb;
+                        dp0_enable_a <= 1'b0;
+                        dp0_enable_b <= 1'b0;
+
+                        //reset stage flags
+                        stage_a <= 2'd2;
+                        stage_b <= 2'd3;
+                        stage_c <= 2'd3;
+
+                        if (sp_read_cycle == 4'd15) begin // have done all reads to compute the current 8 by 8 matrix
+                            s_prime_adr <= 6'd0;
+                            sp_adrb <= 6'd8;
+                            T_end <= 1'b1;
+                        end
+                        //begin using next two rows of s'
+                        else if ((sp_read_cycle == 4'd3) ||(sp_read_cycle == 4'd7) || (sp_read_cycle == 4'd11)) begin
+                            s_prime_adr <= s_prime_adr + 6'd9;
+                            sp_adrb <= sp_adrb + 6'd9;
+                        end else begin // reset the s' values to the start of the rows
+                            s_prime_adr <= s_prime_adr - 6'd7;
+                            sp_adrb <= sp_adrb - 6'd7;
+                        end
+                    end else begin
+                        dp0_adr_a <= s_prime_adr;
+                        dp0_adr_b <= sp_adrb;
+                        dp0_enable_a <= 1'b0;
+                        dp0_enable_b <= 1'b0;
+                        s_prime_adr <= s_prime_adr + 1'd1;
+                        sp_adrb <= sp_adrb + 1'd1;
+                        stage_c <= stage_c - 2'd1;
+                    end
+                end //end stage_c  
+                //begin lead out (5 cycles)
+            end else begin //T_end
+                //first 2 cycles: computing and accumulating (-1)
+                if (|compute_end) begin
+                    t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
+                    t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
+                    t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
+                    t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
+
+                    //setting operands for the matrix multiplications
+                    op1 <= dp0_read_data_a;
+                    op2 <= dp0_read_data_b;
+                    c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
+                    c_pair_count <= c_pair_count + 1'd1;                  
+                end 
+
+                // next cycle: final accumulation (-1)
+                else if (last_multiplication) begin
+                    last_multiplication <= 1'b0;
+                    t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
+                    t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
+                    t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
+                    t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
+                end 
+
+                // next cycle: writing(-1) first pair into DPRAM
+                else if (tb_adr == 6'd62) begin
+                    dp1_adr_a <= ta_adr;
+                    dp1_adr_b <= tb_adr;
+                    dp1_write_data_a <= result_t_aa;
+                    dp1_write_data_b <= result_t_ba;
+                    dp1_enable_a <= 1'b1;
+                    dp1_enable_b <= 1'b1;
+                    ta_adr <= ta_adr + 1'd1;
+                    tb_adr <= tb_adr + 1'd1;
+                end 
+
+                // last cycle: writing(-1) second pair into DPRAM, reset for next megastate reentry
+                else begin
+                    dp1_adr_a <= ta_adr;
+                    dp1_adr_b <= tb_adr;
+                    dp1_write_data_a <= result_t_ab;
+                    dp1_write_data_b <= result_t_bb;
+                    dp1_enable_a <= 1'b1;
+                    dp1_enable_b <= 1'b1;
+                    ta_adr <= 6'd0;
+                    tb_adr <= 6'd0;
+                    state <= megastate_1;
                 end
+            end
         end //end compute_in
         
         S_compute_out1: begin
