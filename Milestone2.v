@@ -390,7 +390,47 @@ always @(posedge CLOCK or negedge Resetn) begin
         end
         
         S_compute_out2: begin
-            if (out2 == 3'd0) begin
+            if (out2 == 3'd1) begin
+                s_aa <= { 8{prod1[31]}, prod1[31:8] };
+                s_ab <= { 8{prod2[31]}, prod2[31:8] };
+                s_ba <= { 8{prod3[31]}, prod3[31:8] };
+                s_bb <= { 8{prod4[31]}, prod4[31:8] };
+            end
+            if (out2 > 3'd1) begin
+                s_aa <= s_aa + { 8{prod1[31]}, prod1[31:8] };
+                s_ab <= s_ab + { 8{prod2[31]}, prod2[31:8] };
+                s_ba <= s_ba + { 8{prod3[31]}, prod3[31:8] };
+                s_bb <= s_bb + { 8{prod4[31]}, prod4[31:8] };
+            end
+            
+            dp1_adr_a <= s_adr;
+            s_adr <= s_adr + 1'd1;
+            dp1_adr_b <= s_adrb;
+            s_adrb <= s_adrb + 1'd1;
+            dp1_enable_a <= 1'b0;
+            dp1_enable_b <= 1'b0;
+
+            op1 <= dp1_read_data_a;
+            op2 <= dp1_read_data_b;
+            transpose_pair <= transpose_pair_count; //sets op3 and op4 as values from the C transpose matrix
+            transpose_pair_count <= transpose_pair_count + 1'd1;
+            out2 <= out2 + 1'd1;
+            
+            if (out2 == 3'd5) begin
+                s_adr <= 8'd0;
+                s_adrb <= 8'd8;
+                s_read_cycle <= 4'd1;
+                m2_state <= S_compute_out3;
+            end
+        end
+        
+        S_compute_out3: begin //common case of 
+            if (|stage_a_out) begin
+                s_aa <= s_aa + { 8{prod1[31]}, prod1[31:8] };
+                s_ab <= s_ab + { 8{prod2[31]}, prod2[31:8] };
+                s_ba <= s_ba + { 8{prod3[31]}, prod3[31:8] };
+                s_bb <= s_bb + { 8{prod4[31]}, prod4[31:8] };
+
                 dp1_adr_a <= s_adr;
                 s_adr <= s_adr + 1'd1;
                 dp1_adr_b <= s_adrb;
@@ -400,12 +440,166 @@ always @(posedge CLOCK or negedge Resetn) begin
 
                 op1 <= dp1_read_data_a;
                 op2 <= dp1_read_data_b;
-                c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
-                transpose_pair_count <= trasnpose_pair_count + 1'd1;
-                out2 <= out2 + 1'd1;
+                transpose_pair <= transpose_pair_count; //sets op3 and op4 as values from the C transpose matrix
+                transpose_pair_count <= transpose_pair_count + 1'd1;
+
+                stage_a_out <= stage_a_out - 2'd1;
+            end
+            else if (|stage_b_out) begin
+                //accumulating the results of the previous cycle's multiplication
+                if(stage_b_out == 2'd3) begin
+                    result_s_aa <= s_aa + { 8{prod1[31]}, prod1[31:8] };
+                    result_s_ab <= s_ab + { 8{prod2[31]}, prod2[31:8] };
+                    result_s_ba <= s_ba + { 8{prod3[31]}, prod3[31:8] };
+                    result_s_bb <= s_bb + { 8{prod4[31]}, prod4[31:8] }; 
+                end
+                else if ((c_count_pair == 5'd1) || (c_count_pair == 5'd9) || (c_count_pair == 5'd17) || (c_count_pair == 5'd25)) begin
+                    s_aa <= { 8{prod1[31]}, prod1[31:8] };
+                    s_ab <= { 8{prod2[31]}, prod2[31:8] };
+                    s_ba <= { 8{prod3[31]}, prod3[31:8] };
+                    s_bb <= { 8{prod4[31]}, prod4[31:8] };
+                end
+                else begin
+                    s_aa <= s_aa + { 8{prod1[31]}, prod1[31:8] };
+                    s_ab <= s_ab + { 8{prod2[31]}, prod2[31:8] };
+                    s_ba <= s_ba + { 8{prod3[31]}, prod3[31:8] };
+                    s_bb <= s_bb + { 8{prod4[31]}, prod4[31:8] };
+                end 
+
+                //reading s values from dp-ram 1
+                dp1_adr_a <= s_adr;
+                s_adr <= s_adr + 1'd1;
+                dp1_adr_b <= s_adrb;
+                s_adrb <= s_adrb + 1'd1;
+                dp1_enable_a <= 1'b0;
+                dp1_enable_b <= 1'b0;
+
+                //setting operands for the matrix multiplications
+                op1 <= dp1_read_data_a;
+                op2 <= dp1_read_data_b;
+                c_pair <= c_pair_count; //sets op3 and op4 as values from the C transpose matrix
+                transpose_pair_count <= transpose_pair_count + 1'd1;
+
+                //writing the 4 s values into dp-ram 2
+                if (stage_b_out == 2'd2) begin
+                    dp2_adr_a <= sa_adr;
+                    dp2_adr_b <= sb_adr;
+                    dp2_write_data_a <= result_s_aa;
+                    dp2_write_data_b <= result_s_ba;
+                    dp2_enable_a <= 1'b1;
+                    dp2_enable_b <= 1'b1;
+                    sa_adr <= sa_adr + 1'd1;
+                    sb_adr <= sb_adr + 1'd1;
+                end
+                if (stage_b == 2'd1) begin
+                    dp2_adr_a <= sa_adr;
+                    dp2_adr_b <= sb_adr;
+                    dp2_write_data_a <= result_s_aa;
+                    dp2_write_data_b <= result_s_ba;
+                    dp2_enable_a <= 1'b1;
+                    dp2_enable_b <= 1'b1;
+
+                    if ((sa_adr == 6'd7) || (sa_adr == 6'd23) || (sa_adr == 6'd39) || (sa_adr == 6'd55)) begin
+                        sa_adr <= sa_adr + 1'd9;
+                        sb_adr <= sb_adr + 1'd9;
+                    end else begin
+                        sa_adr <= sa_adr + 1'd1;
+                        sb_adr <= sb_adr + 1'd1;
+                    end
+                end
+                stage_b_out <= stage_b_out - 2'd1;
+            end //stage_b
+            else begin //stage_c
+
+                //accumulating the results of the previous cycle's multiplication
+                s_aa <= s_aa + { 8{prod1[31]}, prod1[31:8] };
+                s_ab <= s_ab + { 8{prod2[31]}, prod2[31:8] };
+                s_ba <= s_ba + { 8{prod3[31]}, prod3[31:8] };
+                s_bb <= s_bb + { 8{prod4[31]}, prod4[31:8] };
+
+                //setting operands for the matrix multiplications
+                op1 <= dp1_read_data_a;
+                op2 <= dp1_read_data_b;
+                c_pair <= c_pair_count; //sets op3 and op4 as values from the C transpose matrix
+                transpose_pair_count <= transpose_pair_count + 1'd1;
+
+                // reading s values 
+                if (stage_c_out == 2'd1) begin //last read of the current set of 4 multiplications
+                    dp1_adr_a <= s_prime_adr;
+                    dp1_adr_b <= sp_adrb;
+                    dp1_enable_a <= 1'b0;
+                    dp1_enable_b <= 1'b0;
+
+                    stage_a_out <= 2'd2;
+                    stage_b_out <= 2'd3;
+                    stage_c_out <= 2'd3;
+
+                    if (s_read_cycle == 4'd15) begin // have done all reads to compute the current 8 by 8 matrix
+                        s_adr <= 6'd0;
+                        s_adrb <= 6'd8;
+                        m2_state <= S_compute_out4
+                    end
+                    //begin using next two rows of s'
+                    else if ((s_read_cycle == 4'd3) ||(s_read_cycle == 4'd7) || (s_read_cycle == 4'd11)) begin
+                        s_adr <= s_adr + 6'd9;
+                        s_adrb <= s_adrb + 6'd9;
+                    end else begin // reset the s values to the start of the rows
+                        s_adr <= s_adr - 6'd7;
+                        s_adrb <= s_adrb - 6'd7;
+                    end
+                end else begin
+                    dp1_adr_a <= s_adr;
+                    s_adr <= s_adr + 1'd1;
+                    dp1_adr_b <= s_adrb;
+                    s_adrb <= s_adrb + 1'd1;
+                    dp1_enable_a <= 1'b0;
+                    dp1_enable_b <= 1'b0;
+                    stage_c_out <= stage_c_out - 2'd1;
+                end
+            end //end stage_c
+        end //end compute_out3
+        
+        S_compute_out4: begin
+            if (|compute_end_out) begin
+                s_aa <= s_aa + { 8{prod1[31]}, prod1[31:8] };
+                s_ab <= s_ab + { 8{prod2[31]}, prod2[31:8] };
+                s_ba <= s_ba + { 8{prod3[31]}, prod3[31:8] };
+                s_bb <= s_bb + { 8{prod4[31]}, prod4[31:8] };
+
+                //setting operands for the matrix multiplications
+                op1 <= dp1_read_data_a;
+                op2 <= dp1_read_data_b;
+                c_pair <= c_pair_count; //sets op3 and op4 as values from the C transpose matrix
+                transpose_pair_count <= transpose_pair_count + 1'd1;
+
+                compute_end_out <= compute_end_out - 2'd1;
+            end else if (last_multiplication_out) begin
+                last_multiplication_out <= 1'b0;
+                result_s_aa <= s_aa + { 8{prod1[31]}, prod1[31:8] };
+                result_s_ab <= s_ab + { 8{prod2[31]}, prod2[31:8] };
+                result_s_ba <= s_ba + { 8{prod3[31]}, prod3[31:8] };
+                result_s_bb <= s_bb + { 8{prod4[31]}, prod4[31:8] };
+            end else if (sb_adr == 6'd62) begin
+                dp2_adr_a <= sa_adr;
+                dp2_adr_b <= sb_adr;
+                dp2_write_data_a <= result_s_aa;
+                dp2_write_data_b <= result_s_ba;
+                dp2_enable_a <= 1'b1;
+                dp2_enable_b <= 1'b1;
+                sa_adr <= sa_adr + 1'd1;
+                sb_adr <= sb_adr + 1'd1;
+            end else begin
+                dp2_adr_a <= sa_adr;
+                dp2_adr_b <= sb_adr;
+                dp2_write_data_a <= result_s_aa;
+                dp2_write_data_b <= result_s_ba;
+                dp2_enable_a <= 1'b1;
+                dp2_enable_b <= 1'b1;
+                sa_adr <= 6'd0;
+                sb_adr <= 6'd0;
+                state <= S_write_outa;
             end
         end
-            
         
         endcase
     
