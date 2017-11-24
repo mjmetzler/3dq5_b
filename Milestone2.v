@@ -33,31 +33,31 @@ assign prod4_long = $signed(op3*op4);//op2*op4;
 assign prod1 = (prod4_long[63] == 1'b0 ? (prod4_long[31:0] : ~prod4_long[31:0] + 1'd1));
 
 //modulo-counter system for reading Y
-logic [17:0] read_address;
-logic [8:0] RA, CA;
-logic [5:0] counterM, counterC;
-logic [4:0] counterR;
-logic [2:0] ri, ci;
+logic [17:0] read_address_y;
+logic [8:0] RA_ry, CA_ry;
+logic [5:0] counterM_ry, counterC_ry;
+logic [4:0] counterR_ry;
+logic [2:0] ri_ry, ci_ry;
 
-assign ri = counterM[5:3];
-assign ci = counterM[2:0];
-assign RA = {counterR,ri};
-assign CA = {counterC,ci};
-assign read_address = yidct_offset + {RA,8'd0} + {RA,6'd0} + CA;
+assign ri_ry = counterM_ry[5:3];
+assign ci_ry = counterM_ry[2:0];
+assign RA_ry = {counterR_ry,ri_ry};
+assign CA_ry = {counterC_ry,ci_ry};
+assign read_address_y = yidct_offset + {RA_ry,8'd0} + {RA_ry,6'd0} + CA_ry;
 
 //modulo-counter system for writing Y
-logic [17:0] write_address;
-logic [7:0] RA_y, CA_y;
-logic [5:0] counterC_y;
-logic [4:0] counterM_y, counterR_y;
-logic [2:0] ri_y;
-logic [1:0] ci_y;
+logic [17:0] write_address_y;
+logic [7:0] RA_wy, CA_wy;
+logic [5:0] counterC_wy;
+logic [4:0] counterM_wy, counterR_wy;
+logic [2:0] ri_wy;
+logic [1:0] ci_wy;
 
-assign ri_y = counterM_y[4:2];
-assign ci_y = counterM_y[1:0];
-assign RA_y = {counterR_y,ri_y};
-assign CA_y = {counterC_y,ci_y};
-assign write_address = y_offset + {RA_y,7'd0} + {RA_y,5'd0} + CA_y;
+assign ri_wy = counterM_wy[4:2];
+assign ci_wy = counterM_wy[1:0];
+assign RA_wy = {counterR_wy,ri_wy};
+assign CA_wy = {counterC_wy,ci_wy};
+assign write_address_y = y_offset + {RA_wy,7'd0} + {RA_wy,5'd0} + CA_wy;
 
 //modulo-counter system for reading U/V
 logic [17:0] read_address_uv;
