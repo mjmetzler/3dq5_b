@@ -134,8 +134,8 @@ always @(posedge CLOCK or negedge Resetn) begin
                     dp0_enable_a <= 1'b0;
                     dp0_enable_b <= 1'b0;
                     
-                    op1 <= dp0_read_data_a; //sign extend
-                    op2 <= { 16{dp0_read_data_b[15]}, dp0_read_data_b };
+                    op1 <= dp0_read_data_a;
+                    op2 <= dp0_read_data_b;
                     c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
                     c_pair_count <= c_pair_count + 1'd1;
                     leadT <= leadT + 1'd1;
@@ -149,21 +149,21 @@ always @(posedge CLOCK or negedge Resetn) begin
                     dp0_enable_b <= 1'b0;
                     
                     op1 <= dp0_read_data_a;
-                    op2 <= { 16{dp0_read_data_b[15]}, dp0_read_data_b };
+                    op2 <= dp0_read_data_b;
                     c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
                     c_pair_count <= c_pair_count + 1'd1;
                     
                     if(leadT == 3'd3) begin
-                        t_aa <= prod1[23:8];
-                        t_ab <= prod2[23:8];
-                        t_ba <= prod3[23:8];
-                        t_bb <= prod4[23:8];
+                        t_aa <= { 8{prod1[31]}, prod1[31:8] };
+                        t_ab <= { 8{prod2[31]}, prod2[31:8] };
+                        t_ba <= { 8{prod3[31]}, prod3[31:8] };
+                        t_bb <= { 8{prod4[31]}, prod4[31:8] };
                     end
                     else begin
-                        t_aa <= t_aa + signed(prod1[23:8]);
-                        t_ab <= t_ab + siprod2[23:8];
-                        t_ba <= t_ba + prod3[23:8];
-                        t_bb <= t_bb + prod4[23:8];
+                        t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
+                        t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
+                        t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
+                        t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
                     end
                     
                     if (leadT == 3'd7) begin
@@ -177,10 +177,10 @@ always @(posedge CLOCK or negedge Resetn) begin
                 end
                 else if (!T_end) begin
                     if (|stage_a) begin
-                        t_aa <= t_aa + prod1[23:8];
-                        t_ab <= t_ab + prod2[23:8];
-                        t_ba <= t_ba + prod3[23:8];
-                        t_bb <= t_bb + prod4[23:8];
+                        t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
+                        t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
+                        t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
+                        t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
                                                 
                         dp0_adr_a <= s_prime_adr;
                         s_prime_adr <= s_prime_adr + 1'd1;
@@ -190,7 +190,7 @@ always @(posedge CLOCK or negedge Resetn) begin
                         dp0_enable_b <= 1'b0;
 
                         op1 <= dp0_read_data_a;
-                        op2 <= { 16{dp0_read_data_b[15]}, dp0_read_data_b };
+                        op2 <= dp0_read_data_b;
                         c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
                         c_pair_count <= c_pair_count + 1'd1;
                         
@@ -199,22 +199,22 @@ always @(posedge CLOCK or negedge Resetn) begin
                     else if (|stage_b) begin
                         //accumulating the results of the previous cycle's multiplication
                         if(stage_b == 2'd3) begin
-                            result_t_aa <= t_aa + prod1[23:8];
-                            result_t_ab <= t_ab + prod2[23:8];
-                            result_t_ba <= t_ba + prod3[23:8];
-                            result_t_bb <= t_bb + prod4[23:8]; 
+                            result_t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
+                            result_t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
+                            result_t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
+                            result_t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] }; 
                         end
                         else if ((c_count_pair == 5'd1) || (c_count_pair == 5'd9) || (c_count_pair == 5'd17) || (c_count_pair == 5'd25)) begin
-                            t_aa <= prod1[23:8];
-                            t_ab <= prod2[23:8];
-                            t_ba <= prod3[23:8];
-                            t_bb <= prod4[23:8];
+                            t_aa <= { 8{prod1[31]}, prod1[31:8] };
+                            t_ab <= { 8{prod2[31]}, prod2[31:8] };
+                            t_ba <= { 8{prod3[31]}, prod3[31:8] };
+                            t_bb <= { 8{prod4[31]}, prod4[31:8] };
                         end
                         else begin
-                            t_aa <= t_aa + prod1[23:8];
-                            t_ab <= t_ab + prod2[23:8];
-                            t_ba <= t_ba + prod3[23:8];
-                            t_bb <= t_bb + prod4[23:8];
+                            t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
+                            t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
+                            t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
+                            t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
                         end 
                         
                         //reading s' values from dp-ram 0
@@ -227,7 +227,7 @@ always @(posedge CLOCK or negedge Resetn) begin
                         
                         //setting operands for the matrix multiplications
                         op1 <= dp0_read_data_a;
-                        op2 <= { 16{dp0_read_data_b[15]}, dp0_read_data_b };
+                        op2 <= dp0_read_data_b;
                         c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
                         c_pair_count <= c_pair_count + 1'd1;
                         
@@ -263,14 +263,14 @@ always @(posedge CLOCK or negedge Resetn) begin
                     else begin //stage_c
                         
                         //accumulating the results of the previous cycle's multiplication
-                            t_aa <= t_aa + prod1[23:8];
-                            t_ab <= t_ab + prod2[23:8];
-                            t_ba <= t_ba + prod3[23:8];
-                            t_bb <= t_bb + prod4[23:8];
+                        t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
+                        t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
+                        t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
+                        t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
                         
                         //setting operands for the matrix multiplications
                         op1 <= dp0_read_data_a;
-                        op2 <= { 16{dp0_read_data_b[15]}, dp0_read_data_b };
+                        op2 <= dp0_read_data_b;
                         c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
                         c_pair_count <= c_pair_count + 1'd1;
                         
@@ -310,22 +310,22 @@ always @(posedge CLOCK or negedge Resetn) begin
                     end //end stage_c   
                 end else begin //T_end
                     if (|compute_end) begin
-                        t_aa <= t_aa + prod1[23:8];
-                        t_ab <= t_ab + prod2[23:8];
-                        t_ba <= t_ba + prod3[23:8];
-                        t_bb <= t_bb + prod4[23:8];
+                        t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
+                        t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
+                        t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
+                        t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
                         
                         //setting operands for the matrix multiplications
                         op1 <= dp0_read_data_a;
-                        op2 <= { 16{dp0_read_data_b[15]}, dp0_read_data_b };
+                        op2 <= dp0_read_data_b;
                         c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
                         c_pair_count <= c_pair_count + 1'd1;
                     end else if (last_multiplication) begin
                         last_multiplication <= 1'b0;
-                        t_aa <= t_aa + prod1[23:8];
-                        t_ab <= t_ab + prod2[23:8];
-                        t_ba <= t_ba + prod3[23:8];
-                        t_bb <= t_bb + prod4[23:8];
+                        t_aa <= t_aa + { 8{prod1[31]}, prod1[31:8] };
+                        t_ab <= t_ab + { 8{prod2[31]}, prod2[31:8] };
+                        t_ba <= t_ba + { 8{prod3[31]}, prod3[31:8] };
+                        t_bb <= t_bb + { 8{prod4[31]}, prod4[31:8] };
                     end else if (tb_adr == 6'd62) begin
                         dp1_adr_a <= ta_adr;
                         dp1_adr_b <= tb_adr;
@@ -370,8 +370,8 @@ always @(posedge CLOCK or negedge Resetn) begin
                 dp1_enable_a <= 1'b0;
                 dp1_enable_b <= 1'b0;
 
-                op1 <=  {16{dp1_read_data_a[15]},dp1_read_data_a};
-                op2 <= { 16{dp1_read_data_b[15]}, dp1_read_data_b };
+                op1 <= dp1_read_data_a;
+                op2 <= dp1_read_data_b;
                 c_pair <= c_pair_count; //sets op3 and op4 as values from the C matrix
                 transpose_pair_count <= trasnpose_pair_count + 1'd1;
                 out2 <= out2 + 1'd1;
