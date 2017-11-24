@@ -468,10 +468,10 @@ always @(posedge CLOCK or negedge Resetn) begin
         
         //2 cycles reading the t matrix    
         S_compute_out1: begin
-            dp1_adr_a <= s_adr;
-            s_adr <= s_adr + 1'd1;
-            dp1_adr_b <= s_adrb;
-            s_adrb <= s_adrb + 1'd1;
+            dp1_adr_a <= ta_adr;
+            ta_adr <= ta_adr + 1'd1;
+            dp1_adr_b <= tb_adr;
+            tb_adr <= tb_adr + 1'd1;
             dp1_enable_a <= 1'b0;
             dp1_enable_b <= 1'b0;
             if (out1_first) begin
@@ -497,10 +497,10 @@ always @(posedge CLOCK or negedge Resetn) begin
             end
             
             //address incrementation
-            dp1_adr_a <= s_adr;
-            s_adr <= s_adr + 1'd1;
-            dp1_adr_b <= s_adrb;
-            s_adrb <= s_adrb + 1'd1;
+            dp1_adr_a <= ta_adr;
+            ta_adr <= ta_adr + 1'd1;
+            dp1_adr_b <= tb_adr;
+            tb_adr <= tb_adr + 1'd1;
             dp1_enable_a <= 1'b0;
             dp1_enable_b <= 1'b0;
 
@@ -513,9 +513,9 @@ always @(posedge CLOCK or negedge Resetn) begin
             
             //state transitions and reset
             if (out2 == 3'd5) begin
-                s_adr <= 8'd0;
-                s_adrb <= 8'd8;
-                s_read_cycle <= 4'd1;
+                ta_adr <= 8'd0;
+                tb_adr <= 8'd8;
+                t_read_cycle <= 4'd1;
                 m2_state <= S_compute_out3;
             end
         end
@@ -530,10 +530,10 @@ always @(posedge CLOCK or negedge Resetn) begin
                 s_bb <= s_bb + { 8{prod4[31]}, prod4[31:8] };
 
                 //address increments
-                dp1_adr_a <= s_adr;
-                s_adr <= s_adr + 1'd1;
-                dp1_adr_b <= s_adrb;
-                s_adrb <= s_adrb + 1'd1;
+                dp1_adr_a <= ta_adr;
+                ta_adr <= ta_adr + 1'd1;
+                dp1_adr_b <= tb_adr;
+                tb_adr <= tb_adr + 1'd1;
                 dp1_enable_a <= 1'b0;
                 dp1_enable_b <= 1'b0;
                 
@@ -569,10 +569,10 @@ always @(posedge CLOCK or negedge Resetn) begin
                 end 
 
                 //reading s values from dp-ram 1
-                dp1_adr_a <= s_adr;
-                s_adr <= s_adr + 1'd1;
-                dp1_adr_b <= s_adrb;
-                s_adrb <= s_adrb + 1'd1;
+                dp1_adr_a <= ta_adr;
+                ta_adr <= ta_adr + 1'd1;
+                dp1_adr_b <= tb_adr;
+                tb_adr <= tb_adr + 1'd1;
                 dp1_enable_a <= 1'b0;
                 dp1_enable_b <= 1'b0;
 
@@ -629,8 +629,8 @@ always @(posedge CLOCK or negedge Resetn) begin
 
                 // reading s values 
                 if (stage_c_out == 2'd1) begin //last read of the current set of 4 multiplications
-                    dp1_adr_a <= s_prime_adr;
-                    dp1_adr_b <= sp_adrb;
+                    dp1_adr_a <= ta_adr;
+                    dp1_adr_b <= tb_adr;
                     dp1_enable_a <= 1'b0;
                     dp1_enable_b <= 1'b0;
 
@@ -638,24 +638,24 @@ always @(posedge CLOCK or negedge Resetn) begin
                     stage_b_out <= 2'd3;
                     stage_c_out <= 2'd3;
 
-                    if (s_read_cycle == 4'd15) begin // have done all reads to compute the current 8 by 8 matrix
-                        s_adr <= 6'd0;
-                        s_adrb <= 6'd8;
+                    if (t_read_cycle == 4'd15) begin // have done all reads to compute the current 8 by 8 matrix
+                        ta_adr <= 6'd0;
+                        tb_adr <= 6'd8;
                         m2_state <= S_compute_out4
                     end
                     //begin using next two rows of s'
-                    else if ((s_read_cycle == 4'd3) ||(s_read_cycle == 4'd7) || (s_read_cycle == 4'd11)) begin
-                        s_adr <= s_adr + 6'd9;
-                        s_adrb <= s_adrb + 6'd9;
+                    else if ((t_read_cycle == 4'd3) || (t_read_cycle == 4'd7) || (t_read_cycle == 4'd11)) begin
+                        ta_adr <= ta_adr + 6'd9;
+                        tb_adr <= tb_adr + 6'd9;
                     end else begin // reset the s values to the start of the rows
-                        s_adr <= s_adr - 6'd7;
-                        s_adrb <= s_adrb - 6'd7;
+                        ta_adr <= ta_adr - 6'd7;
+                        tb_adr <= tb_adr - 6'd7;
                     end
                 end else begin
-                    dp1_adr_a <= s_adr;
-                    s_adr <= s_adr + 1'd1;
-                    dp1_adr_b <= s_adrb;
-                    s_adrb <= s_adrb + 1'd1;
+                    dp1_adr_a <= ta_adr;
+                    ta_adr <= ta_adr + 1'd1;
+                    dp1_adr_b <= tb_adr;
+                    tb_adr <= tb_adr + 1'd1;
                     dp1_enable_a <= 1'b0;
                     dp1_enable_b <= 1'b0;
                     stage_c_out <= stage_c_out - 2'd1;
